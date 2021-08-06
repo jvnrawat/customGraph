@@ -43,6 +43,10 @@ class AppData: NSObject {
 
 extension AppData {
     
+    func refreshCovidData(completion: (() -> ())? = nil) {
+        totalCovidData.removeAll() // resetting data
+        self.getWorldCovidData(completion: completion)
+    }
     
     func getWorldCovidData(completion: (() -> ())? = nil) {
         if covidDataCompletionBlock == nil {
@@ -50,43 +54,48 @@ extension AppData {
         }
         if let country = self.filterdCountries?[safe: currentIndex] {
             currentIndex = currentIndex + 1
-            getCovidData(by: country) {
+            getCovidData(by: country) { data in
+                if let totalData = data {
+                    self.totalCovidData.append(totalData)
+                }
                 self.getWorldCovidData()
             }
         }else {
             currentIndex = 0
             print("fetched covid data for counties", totalCovidData.count)
-            covidDataCompletionBlock?()
+//            if !(MainClass.appdelegate?.refreshData ?? Bool()){
+                covidDataCompletionBlock?()
+//            }
+           
         }
     }
     
-    
-    func getCovidData(by country: Country, completion: (() -> ())? = nil) {
+    func getCovidData(by country: Country, completion: ((_ totalData: FullData?) -> ())? = nil) {
         let monthDates = Date().getAllDays()
         let startDate = monthDates.first!.startDateOfTheDay().convertDateToTZFormat()
         let endDate = monthDates.last!.startDateOfTheDay().convertDateToTZFormat()
-        print("getting covid data for", country.name, "and in range of", "\(monthDates.first!.startDateOfTheDay().convertToDate()) - \(monthDates.last!.startDateOfTheDay().convertToDate())")
+      //  print("getting covid data for", country.name, "and in range of", "\(monthDates.first!.startDateOfTheDay().convertToDate()) - \(monthDates.last!.startDateOfTheDay().convertToDate())")
         guard let slug = country.slug else {
-            completion?()
+            completion?(nil)
             return
         }
         apiWrapper.getCovidDataStatus(of: slug, fromDate: startDate, toDate: endDate) { (response) in
             if let jsonArray = response.responseObject as? JSONArray, jsonArray.count > 0 {
                 self.loadCovidDataResponse(response: jsonArray, country: country, completion: completion)
             }else {
-                completion?()
+                completion?(nil)
             }
         }
 
     }
     
-    func loadCovidDataResponse(response: JSONArray, country: Country, completion: (() -> ())? = nil) {
+    func loadCovidDataResponse(response: JSONArray, country: Country, completion: ((_ totalData: FullData?) -> ())? = nil) {
         var covidData = Mapper<Covid>().mapArray(JSONObject: response)
         if covidData?.count == 0 {
-            completion?()
+            completion?(nil)
             return
         }
-        let totaldata = FullData()//FullData(country: nil, TotalConfirmed: nil, covidData: nil, graphColor: nil)
+        let totaldata = FullData()
         totaldata.country = country
         
         covidData = covidData?.filterDuplicates(includeElement: { (session1, session2) -> Bool in
@@ -130,20 +139,17 @@ extension AppData {
                 DispatchQueue.main.async {
                     guard let data = data, error == nil else {
                         print("no image found")
-                        self.totalCovidData.append(totaldata)
-                        completion?()
+                        completion?(totaldata)
                         return
                     }
                     print("image downloaded successfully")
                     totaldata.country?.countryFlag = UIImage(data: data)
-                    self.totalCovidData.append(totaldata)
-                    completion?()
+                    completion?(totaldata)
                 }
             }
         }else {
             print("no image found")
-            totalCovidData.append(totaldata)
-            completion?()
+            completion?(totaldata)
         }
         
     }

@@ -17,6 +17,9 @@ target 'GraphPOC' do
   pod 'Alamofire', '~> 5.1'
   pod 'ObjectMapper'
   pod 'GoogleMaps'
+  pod 'Toast-Swift'
+  pod 'SDLoader'
+  pod 'SVGKit'
   # Pods for GraphPOC
 
 end
